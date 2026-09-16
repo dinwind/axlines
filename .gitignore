@@ -14,6 +14,7 @@ src/vs/base/browser/ui/codicons/codicon/codicon.ttf
 /extensions/**/out/
 build/node_modules
 build/darwin/.dmgbuild
+build/config.gypi
 coverage/
 !/src/vs/platform/agentHost/test/node/e2e/coverage/
 test_data/
@@ -54,3 +55,48 @@ dist
 .v[0-9]*/
 # Local agent validation evidence
 .agent-validation/
+
+# ---------------------------------------------------------------------------
+# Built-in extension install artifacts (AxLine fork)
+#
+# build/npm/postinstall.ts installs each bundled extension's dependencies at the
+# repository root on Windows (instead of preserving the extensions/<name>
+# symlink), producing <name>/package*.json + <name>/node_modules. These are
+# generated build outputs and must not be committed.
+# ---------------------------------------------------------------------------
+/configuration-editing/
+/copilot/
+/css-language-features/
+/debug-auto-launch/
+/debug-server-ready/
+/emmet/
+/extension-editing/
+/git/
+/git-base/
+/github/
+/github-authentication/
+/grunt/
+/gulp/
+/html-language-features/
+/ipynb/
+/jake/
+/json-language-features/
+/markdown-language-features/
+/markdown-math/
+/media-preview/
+/merge-conflict/
+/mermaid-markdown-features/
+/microsoft-authentication/
+/notebook-renderers/
+/npm/
+/php-language-features/
+/references-view/
+/search-result/
+/simple-browser/
+/terminal-suggest/
+/tunnel-forwarding/
+/typescript-language-features/
+/vscode-api-tests/
+/vscode-colorize-perf-tests/
+/vscode-colorize-tests/
+/vscode-test-resolver/
