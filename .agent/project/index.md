@@ -1,3 +1,3 @@
 # Agent Context
 
-This workspace uses Axline's embedded agent context.
+This workspace uses AxLines's embedded agent context.
