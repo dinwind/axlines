@@ -1,0 +1,7 @@
+# Machine-readable Git/PR settings for co branch * and co git hygiene.
+# Initialized by co init / co scaffold; edit if remote or trunk differs.
+
+trunk = "main"
+remote = "origin"
+start_branch_script = "scripts/start-task-branch.ps1"
+post_merge_cleanup_script = "scripts/post-merge-cleanup.ps1"

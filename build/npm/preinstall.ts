@@ -125,8 +125,10 @@ function installHeaders() {
 	// The node gyp package got installed using the above npm command using the gyp/package.json
 	// file checked into our repository. So from that point it is safe to construct the path
 	// to that executable
+	// Quote the executable path on Windows: with `shell: true` below, cmd.exe would
+	// otherwise split unquoted paths containing spaces (e.g. "C:\foo bar\...node-gyp.cmd").
 	const node_gyp = process.platform === 'win32'
-		? path.join(import.meta.dirname, 'gyp', 'node_modules', '.bin', 'node-gyp.cmd')
+		? `"${path.join(import.meta.dirname, 'gyp', 'node_modules', '.bin', 'node-gyp.cmd')}"`
 		: path.join(import.meta.dirname, 'gyp', 'node_modules', '.bin', 'node-gyp');
 
 	const local = getHeaderInfo(path.join(import.meta.dirname, '..', '..', '.npmrc'));

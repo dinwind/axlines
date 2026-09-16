@@ -1,0 +1,18 @@
+{
+  "source": "scaffold",
+  "at": "2026-09-16T09:11:27Z",
+  "summary": "scaffold: 11 file(s) created or overwritten",
+  "paths": [
+    "project/session-journal.md",
+    "project/versioning.md",
+    "project/version-state.toml",
+    "project/AGENT-GIT-PR-WORKFLOW.md",
+    "project/git-config.toml",
+    "project/sop/release.md",
+    "project/sop/debug.md",
+    "project/sop/git-workflow.md",
+    "project/sop/code-review.md",
+    "project/sop/release-doc-refresh.md",
+    "project/sop/agent-git-pr-collaboration.md"
+  ]
+}
