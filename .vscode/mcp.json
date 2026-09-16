@@ -1,29 +1,41 @@
 {
-	"servers": {
-		"vscode-automation-mcp": {
-			"type": "stdio",
-			"command": "npm",
-			"args": [
-				"run",
-				"start-stdio"
-			],
-			"cwd": "${workspaceFolder}/test/mcp"
-		},
-		"component-explorer": {
-			"type": "stdio",
-			"command": "npm",
-			"args": [
-				"exec",
-				"--no",
-				"--",
-				"component-explorer",
-				"mcp",
-				"-p",
-				"./test/componentFixtures/component-explorer.json",
-				"--use-daemon",
-				"-vv"
-			]
-		}
-	},
-	"inputs": []
+  "servers": {
+    "vscode-automation-mcp": {
+      "type": "stdio",
+      "command": "npm",
+      "args": [
+        "run",
+        "start-stdio"
+      ],
+      "cwd": "${workspaceFolder}/test/mcp"
+    },
+    "component-explorer": {
+      "type": "stdio",
+      "command": "npm",
+      "args": [
+        "exec",
+        "--no",
+        "--",
+        "component-explorer",
+        "mcp",
+        "-p",
+        "./test/componentFixtures/component-explorer.json",
+        "--use-daemon",
+        "-vv"
+      ]
+    },
+    "cokodo": {
+      "type": "stdio",
+      "command": "co",
+      "args": [
+        "serve",
+        "--shared-launcher",
+        "${workspaceFolder}"
+      ],
+      "env": {
+        "COKODO_PROJECT_ROOT": "${workspaceFolder}"
+      }
+    }
+  },
+  "inputs": []
 }

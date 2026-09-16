@@ -1,0 +1,22 @@
+# Machine-readable version governance state.
+# Human-readable policy lives in `project/versioning.md`.
+
+schema_version = 1
+updated_at = "2026-09-16"
+owner = "release-governance"
+
+[tracks.primary]
+enabled = true
+display_name = "Primary"
+canonical_source = "package.json"
+derived_sync = []
+current_release = "1.138.0"
+working_version = "1.139.0"
+status = "developing"
+release_note = "docs/operations/primary-release-note-1.139.0.md"
+tag = "v1.139.0"
+rollback_tag = "v1.138.0"
+rollback_note = "Rollback to 1.138.0 if 1.139.0 regresses."
+protocol = ""
+compatibility = []
+scope_refs = []
