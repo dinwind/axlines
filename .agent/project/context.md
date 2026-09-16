@@ -3,7 +3,7 @@
 ## Overview
 
 AxLines is a fork of Microsoft VS Code (code-oss-dev), version 1.139.0.
-Forked from https://github.com/dinwind/axline.git.
+Forked from https://github.com/dinwind/axlines.git.
 
 ## Purpose
 
