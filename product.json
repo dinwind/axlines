@@ -84,6 +84,23 @@
 				},
 				"publisherDisplayName": "Microsoft"
 			}
+		},
+		{
+			"name": "axline.axline",
+			"version": "0.4.97",
+			"sha256": "f9f33b200354dbc6ee8e81304e5af45f75858178615855e15459e9a93f38fc13",
+			"vsix": "scripts/axline.vsix",
+			"repo": "https://github.com/dinwind/xline.git",
+			"metadata": {
+				"id": "7efb3ef4-e20e-4f24-9f5d-98fe8de1a4da",
+				"publisherId": {
+					"publisherId": "b98645e7-ecaa-4d0d-81a4-ce6bc5027e8f",
+					"publisherName": "axline",
+					"displayName": "Axline",
+					"flags": ""
+				},
+				"publisherDisplayName": "Axline"
+			}
 		}
 	],
 	"defaultChatAgent": {
@@ -244,5 +261,8 @@
 		"GitHub.copilot-chat"
 	],
 	"sessionsWindowAllowedExtensions": [],
+	"configurationDefaults": {
+		"workbench.startupEditor": "none"
+	},
 	"voiceWsUrl": "wss://falcon-caas.mai.microsoft.com/voice-code/api/v1/realtime/voice"
 }

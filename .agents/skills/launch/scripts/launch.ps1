@@ -17,6 +17,8 @@ $repo = ''
 $cloneExtensions = $false
 $full = $false
 $skipPreLaunch = $false
+$skipAuthPreflight = $false
+$skipAuthSession = $false
 $disableWorkspaceTrust = $false
 $sessionTitle = ''
 if ($null -eq $cliArgs) {
@@ -204,18 +206,38 @@ function Copy-ProfileDirectory([string]$source, [string]$destination, [bool]$use
 	}
 }
 
-function Assert-AuthCriticalProfileFiles([string]$destination) {
+# Infrastructure files that Code OSS's main process must initialize for Windows
+# authentication to work at all. "Local State" holds the DPAPI-wrapped os_crypt
+# decryption key; "machineid" is the machine identity; "Network" holds cookies/
+# storage the embedded browser needs. None of these can be fabricated by hand —
+# they must be produced by a real first-run of the main process.
+function Assert-CriticalInfrastructureFiles([string]$directory) {
 	$requiredPaths = @(
 		'Local State',
 		'machineid',
-		'User\globalStorage\state.vscdb',
 		'Network'
 	)
 	$missingPaths = @($requiredPaths | Where-Object {
-		-not (Test-Path -LiteralPath (Join-Path $destination $_))
+		-not (Test-Path -LiteralPath (Join-Path $directory $_))
 	})
 	if ($missingPaths.Count -gt 0) {
-		throw "Profile copy is missing auth-critical path(s): $($missingPaths -join ', '). Refusing to launch a profile that cannot preserve Windows authentication."
+		throw "Profile is missing critical infrastructure path(s): $($missingPaths -join ', '). Run Code OSS once against the source profile to initialize it (see below)."
+	}
+}
+
+# Session-bearing storage that determines whether the launched instance is
+# already signed in. The GitHub session blob lives in the shared-data-dir, and
+# older profiles may still hold it in globalStorage. This is OPTIONAL for a
+# sign-in-window flow (skip via --skip-auth-session): the window can prompt for
+# sign-in instead. It must never block launch on its own.
+function Assert-AuthSession([string]$destination, [string]$sharedDataDir) {
+	$sessionPaths = @(
+		(Join-Path $destination 'User\globalStorage\state.vscdb'),
+		(Join-Path $sharedDataDir 'sharedStorage\state.vscdb')
+	)
+	$hasSession = $sessionPaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+	if (-not $hasSession) {
+		Write-LaunchError '[launch.ps1] WARNING: no GitHub session was seeded; the launched window will prompt for sign-in.'
 	}
 }
 
@@ -340,6 +362,52 @@ function Start-Code([string]$codeBat, [string[]]$arguments, [string]$logFile) {
 	return $process
 }
 
+# Run the real Code OSS main process once against the source profile so it
+# self-initializes the Windows authentication infrastructure ("Local State",
+# "machineid", "Network"). These are written by the main process very early in
+# startup and cannot be fabricated by hand. We launch headlessly, wait until
+# all three appear on disk, then kill the throwaway instance.
+function Initialize-SourceProfile([string]$codeBat, [string]$userDataDir, [string]$logFile) {
+	$requiredPaths = @('Local State', 'machineid', 'Network')
+	$missingPaths = @($requiredPaths | Where-Object {
+		-not (Test-Path -LiteralPath (Join-Path $userDataDir $_))
+	})
+	if ($missingPaths.Count -eq 0) {
+		return
+	}
+
+	Write-LaunchError "[launch.ps1] source profile missing infrastructure ($($missingPaths -join ', ')); running a throwaway first-run to initialize it..."
+	New-Item -ItemType Directory -Force -Path $userDataDir | Out-Null
+	$proc = Start-Code $codeBat @('--user-data-dir', $userDataDir, '--skip-welcome', '--disable-extensions') $logFile
+
+	# Wait up to 60s for the three files to be created by the main process.
+	$deadline = (Get-Date).AddSeconds(60)
+	$ready = $false
+	while (-not $ready -and (Get-Date) -lt $deadline) {
+		Start-Sleep -Milliseconds 300
+		$ready = -not (@($requiredPaths | Where-Object { -not (Test-Path -LiteralPath (Join-Path $userDataDir $_)) }).Count -gt 0)
+		if ($proc.HasExited) {
+			if (-not $ready) {
+				Write-LaunchError '[launch.ps1] throwaway profile init exited before writing infrastructure files.'
+			}
+			break
+		}
+	}
+
+	if (-not $proc.HasExited) {
+		# Give it a moment to flush, then terminate the throwaway instance.
+		Start-Sleep -Milliseconds 500
+		Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+	}
+
+	$stillMissing = @($requiredPaths | Where-Object { -not (Test-Path -LiteralPath (Join-Path $userDataDir $_)) })
+	if ($stillMissing.Count -gt 0) {
+		Write-LogTail $logFile
+		throw "Failed to initialize source profile infrastructure: still missing $($stillMissing -join ', '). Ensure a compiled Code OSS build exists, then retry."
+	}
+	Write-LaunchError "[launch.ps1] source profile infrastructure initialized."
+}
+
 $extraArgs = [System.Collections.Generic.List[string]]::new()
 for ($index = 0; $index -lt $cliArgs.Count; $index++) {
 	$argument = $cliArgs[$index]
@@ -383,6 +451,14 @@ for ($index = 0; $index -lt $cliArgs.Count; $index++) {
 		}
 		'--skip-prelaunch' {
 			$skipPreLaunch = $true
+			continue
+		}
+		'--skip-auth-preflight' {
+			$skipAuthPreflight = $true
+			continue
+		}
+		'--skip-auth-session' {
+			$skipAuthSession = $true
 			continue
 		}
 		'--disable-workspace-trust' {
@@ -447,6 +523,14 @@ try {
 	$logFile = Join-Path $runDir 'code.log'
 	New-Item -ItemType Directory -Force -Path $runDir, $sharedDataDir | Out-Null
 	[IO.File]::WriteAllText($logFile, '', [Text.UTF8Encoding]::new($false))
+
+	# Ensure the source profile has its Windows-auth infrastructure files before
+	# we copy it. A sign-in-window launch still needs "Local State", "machineid"
+	# and "Network" to exist so a fresh sign-in can actually be persisted.
+	if (-not $skipAuthPreflight) {
+		Initialize-SourceProfile $codeBat $sourceUserDataDir $logFile
+	}
+
 	$sourceSharedDataDir = Get-SourceSharedDataDir $repo
 	if (Test-Path -LiteralPath $sourceSharedDataDir -PathType Container) {
 		# On Windows the GitHub session is APPLICATION_SHARED scoped, so it lives here
@@ -477,7 +561,16 @@ try {
 		Write-LaunchError "[launch.ps1] slim copy: $sourceUserDataDir -> $destinationUdd"
 		Copy-ProfileDirectory $sourceUserDataDir $destinationUdd $true
 	}
-	Assert-AuthCriticalProfileFiles $destinationUdd
+	if ($skipAuthPreflight) {
+		Write-LaunchError '[launch.ps1] skipping auth preflight entirely (--skip-auth-preflight); launched window may not preserve Windows authentication.'
+	} else {
+		Assert-CriticalInfrastructureFiles $destinationUdd
+		if (-not $skipAuthSession) {
+			Assert-AuthSession $destinationUdd $sharedDataDir
+		} else {
+			Write-LaunchError '[launch.ps1] skipping session check (--skip-auth-session); this is a sign-in-window launch.'
+		}
+	}
 
 	New-Item -ItemType Directory -Force -Path $extensionsDir | Out-Null
 	if (-not $full -and $cloneExtensions) {
