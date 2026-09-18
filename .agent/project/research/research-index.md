@@ -13,7 +13,7 @@
 
 | Report | File | Topic | Date |
 |--------|------|-------|------|
-| *(add rows as you add reports)* | | | |
+| Axline Chat Center-Screen Layout Feasibility | `axline-chat-layout-2026-09.md` | Workbench layout restructuring: Chat in center, Editor/Terminal/Git in Secondary Side Bar | 2026-09 |
 
 ---
 
