@@ -57,6 +57,7 @@ SESSION_TITLE=<title-from-get_current_session>
 "$LAUNCH" --full                             # skip slim excludes; copy everything
 "$LAUNCH" --skip-prelaunch                   # reuse already-current build outputs
 "$LAUNCH" --disable-workspace-trust          # avoid trust prompts for trusted automation inputs
+"$LAUNCH" --skip-auth-session                # sign-in-window mode: skip existing-session check
 ```
 
 On Windows, invoke the PowerShell launcher with the same flags:
@@ -74,6 +75,7 @@ $sessionTitle = '<title-from-get_current_session>'
 & $launch --full
 & $launch --skip-prelaunch
 & $launch --disable-workspace-trust
+& $launch --skip-auth-session                # sign-in-window mode: skip existing-session check
 ```
 
 If the local execution policy blocks scripts, invoke it with `powershell -ExecutionPolicy Bypass -File <path-to-launch.ps1>`. The Windows implementation has the same profile isolation, slim-copy excludes, settings merge, port allocation, foreground pre-launch, and CDP-ready contract as the bash launcher; only the shell commands and path syntax differ.
@@ -91,12 +93,28 @@ Windows has no shared per-app keychain for these secrets, so they live in files 
 | Encrypted GitHub session blob | `<shared-data-dir>/sharedStorage/state.vscdb` |
 | DPAPI-wrapped decryption key (`os_crypt.encrypted_key`) | `<user-data-dir>/Local State` |
 
-The launcher therefore seeds **both**: it copies the source profile *and* copies the source shared-data-dir into the run's throwaway `shared-data` dir. The source resolves the same way `IEnvironmentService.appSharedDataHome` does - `$env:CODE_OSS_DEV_AUTHED_SHARED_DATA_DIR` if set, else `$env:VSCODE_PORTABLE\shared-data` when running portable, else `~/<product.sharedDataFolderName>` (i.e. `%USERPROFILE%\.vscode-oss-shared`). It also verifies `Local State`, `machineid`, and `Network` survived the profile copy, and warns on stderr if neither database holds a GitHub session.
+The launcher therefore seeds **both**: it copies the source profile *and* copies the source shared-data-dir into the run's throwaway `shared-data` dir. The source resolves the same way `IEnvironmentService.appSharedDataHome` does - `$env:CODE_OSS_DEV_AUTHED_SHARED_DATA_DIR` if set, else `$env:VSCODE_PORTABLE\shared-data` when running portable, else `~/<product.sharedDataFolderName>` (i.e. `%USERPROFILE%\.vscode-oss-shared`). It verifies auth in two tiers - critical infrastructure files (`Local State`, `machineid`, `Network`) and an existing GitHub session - see [Sign-in-window mode](#sign-in-window-mode-skip-auth-session) below.
 
 > This asymmetry is invisible on macOS/Linux, where the same token lands inside the profile. A Windows-only "always signed out" symptom is a shared-data-dir problem, **not** a profile problem: signing in against the source profile writes a perfectly good session, but before this seeding existed every launch handed Code OSS an empty shared dir and threw it away.
 
 To (re)establish the source session: run `.\scripts\code.bat --user-data-dir=$env:USERPROFILE\.vscode-oss-dev` directly, sign in once, and close it. That writes the blob to `%USERPROFILE%\.vscode-oss-shared` and the key to the profile's `Local State`; later launches copy both and inherit the session.
 
+### Sign-in-window mode (`--skip-auth-session`)
+
+The launcher verifies auth in **two tiers**:
+
+1. **Critical infrastructure (always enforced)** - `Local State`, `machineid`, and `Network` must exist in the source profile, because a fresh sign-in cannot be persisted without the DPAPI decryption key in `Local State`. These are written by Code OSS's main process on first run and **cannot be hand-fabricated**, so the Windows launcher runs a throwaway first-run (`code.bat --user-data-dir=<source> --skip-welcome --disable-extensions`) to self-initialize them before copying, whenever they are missing.
+2. **Existing GitHub session (optional)** - the session blob in the shared-data-dir / `globalStorage`. When the launched window is meant to prompt for sign-in instead of inheriting a session, pass `--skip-auth-session` to skip this tier.
+
+Use `--skip-auth-session` to launch straight into a sign-in flow without a pre-authenticated source profile:
+
+```powershell
+& $launch --agents --skip-auth-session
+```
+
+The critical infrastructure files are still initialized/copied (so sign-in can actually persist); only the "is there already a session?" check is skipped. The existing-session check remains a warning (never a hard block) in normal mode too, so a missing session never prevents launch on its own.
+
+The legacy `--skip-auth-preflight` flag skips **both** tiers entirely and is retained only for backward compatibility during the transition to the sign-in-window flow; prefer `--skip-auth-session`.
 > Profiles that predate the `APPLICATION_SHARED` migration can still hold the secret in `User/globalStorage/state.vscdb`. `ApplicationSharedStorageMain` registers application storage as a read fallback, so those profiles authenticate even with no shared-data-dir present - which is why a missing shared dir is reported as a fact rather than assumed fatal.
 
 Excluded (transient, regenerable, or known-not-needed):

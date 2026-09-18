@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 REM ============================================================================
 REM AxLine VS Code Build Script - Windows x64
 REM Prerequisites: Node.js 24.18.0+, VS 2026/2022 C++ tools, Python 3.x
-REM Usage: scripts\build.bat [install|compile|rebuild|run|watch|clean]
+REM Usage: scripts\build.bat [install|compile|rebuild|run|watch|clean|sync-axline]
 REM ============================================================================
 
 set "PROJECT_ROOT=%~dp0.."
@@ -43,6 +43,7 @@ where node.exe >nul 2>&1 || (echo [ERROR] Node.js not found & exit /b 1)
 for /f "tokens=*" %%v in ('node -v') do echo [INFO] Node: %%v
 
 REM --- Dispatch ---
+if /i "%~1"=="sync-axline" goto :sync_axline
 if /i "%~1"==""        goto :full_build
 if /i "%~1"=="rebuild" goto :rebuild
 if /i "%~1"=="install" goto :install
@@ -54,7 +55,7 @@ if /i "%~1"=="-h"      goto :help
 if /i "%~1"=="--help"  goto :help
 echo [ERROR] Unknown: %~1
 :help
-echo Usage: scripts\build.bat [install^|compile^|rebuild^|run^|watch^|clean]
+echo Usage: scripts\build.bat [install^|compile^|rebuild^|run^|watch^|clean^|sync-axline]
 exit /b 0
 
 REM =====================================================================
@@ -70,6 +71,7 @@ goto :eof
 REM =====================================================================
 :install
 echo [INSTALL] Installing npm deps (10-30 min)...
+call :sync_axline || exit /b 1
 call npm install
 if errorlevel 1 (
     echo [ERROR] npm install failed.
@@ -81,6 +83,7 @@ goto :eof
 REM =====================================================================
 :compile
 echo [COMPILE] Building VS Code...
+call :sync_axline || exit /b 1
 if not exist node_modules (echo [ERROR] Run install first & exit /b 1)
 call npm run gulp compile -- --no-typecheck
 if errorlevel 1 (
@@ -115,6 +118,7 @@ goto :eof
 REM =====================================================================
 :run
 echo [RUN] Build ^& launch VS Code...
+call :sync_axline || exit /b 1
 if not exist node_modules (call :install || exit /b 1)
 if not exist out (call :compile || exit /b 1)
 echo [RUN] Pre-launch setup...
@@ -143,4 +147,19 @@ REM =====================================================================
 echo [WATCH] Starting dev watch mode...
 if not exist node_modules (call :install || exit /b 1)
 npm run watch
+goto :eof
+
+REM =====================================================================
+REM Sync the embedded Axline extension (.vsix) from AuthNexus before building.
+REM Runs the PowerShell worker with -UpdateProductJson so product.json stays
+REM in lock-step with the downloaded artifact (version + sha256).
+REM =====================================================================
+:sync_axline
+echo [SYNC-AXLINE] Checking for latest Axline extension...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0sync-axline-vsix.ps1" -UpdateProductJson
+if errorlevel 1 (
+    echo [ERROR] Axline .vsix sync failed.
+    exit /b 1
+)
+echo [SYNC-AXLINE] Done.
 goto :eof
