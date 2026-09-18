@@ -100,3 +100,9 @@ dist
 /vscode-colorize-perf-tests/
 /vscode-colorize-tests/
 /vscode-test-resolver/
+
+# AxLine fork: build-time generated artifacts
+scripts/__pycache__/
+scripts/axline-vsix-unpacked/
+scripts/icon-backup/
+src/vs/workbench/contrib/axline/
